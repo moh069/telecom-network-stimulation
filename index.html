@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Telecom Network Simulation</title>
+<style>
+body { font-family: 'Roboto', sans-serif; background: linear-gradient(to right, #6dd5ed, #2193b0); color: #333; margin:0; padding:0; }
+h1 { text-align: center; padding: 20px 0; color: #fff; text-shadow: 2px 2px 5px #000; }
+.dashboard { display:flex; max-width: 1200px; margin: auto; background:#fff; border-radius:15px; box-shadow:0 10px 25px rgba(0,0,0,0.3); overflow:hidden; }
+.sidebar { width: 300px; background: #f0f0f0; padding: 20px; border-right:2px solid #ccc; }
+.sidebar h3 { margin-bottom:10px; color:#2193b0; }
+.sidebar p { margin-bottom:15px; line-height:1.4; }
+.main { flex:1; padding:20px; }
+#canvasContainer { position:relative; background:#f9f9f9; border:2px solid #ccc; border-radius:15px; overflow:hidden; }
+canvas { display:block; margin:auto; background:#fff; }
+.btn-container { text-align:center; margin-bottom:20px; }
+.btn-container button { background:#2193b0; color:#fff; border:none; padding:12px 20px; margin:5px; border-radius:50px; cursor:pointer; font-weight:bold; transition:0.3s; box-shadow:0 5px 15px rgba(0,0,0,0.2); }
+.btn-container button:hover { background:#6dd5ed; transform:translateY(-3px); box-shadow:0 8px 20px rgba(0,0,0,0.3); }
+footer { text-align:center; padding:15px; color:#fff; text-shadow:1px 1px 2px #000; font-size:14px; margin-top:20px; }
+</style>
+</head>
+<body>
+
+<h1>Telecom Network Simulation</h1>
+<div class="dashboard">
+    <div class="sidebar">
+        <h3>Algorithms Info</h3>
+        <p><strong>Kruskal Algorithm:</strong> To find minimum cost cable layout to connect all cities.</p>
+        <p><strong>Fleury's Algorithm:</strong> To design inspection routes where an engineer traverses every cable exactly once.</p>
+        <p><strong>Greedy Coloring:</strong> To assign maintenance shifts so no two directly connected cities are maintained on the same day.</p>
+    </div>
+    <div class="main">
+        <div class="btn-container">
+            <button onclick="simulateKruskal()">Simulate Minimum Cost Cable Layouts</button>
+            <button onclick="simulateEuler()">Simulate Inspection Routes (Eulerian Path)</button>
+            <button onclick="simulateGreedy()">Simulate Maintenance Shifts (Greedy Coloring)</button>
+        </div>
+        <div id="canvasContainer">
+            <canvas id="networkCanvas" width="900" height="600"></canvas>
+        </div>
+    </div>
+</div>
+
+<footer>© 2025 Telecom Network Simulation | Designed by 35,45,69</footer>
+
+<script>
+// --- Graph Data ---
+const nodes = [
+    {id:0, x:100, y:100}, {id:1, x:250, y:80}, {id:2, x:400, y:100}, 
+    {id:3, x:550, y:120}, {id:4, x:700, y:150},
+    {id:5, x:150, y:300}, {id:6, x:350, y:350}, 
+    {id:7, x:550, y:350}, {id:8, x:700, y:300}
+];
+
+// ✅ Eulerian Path Graph (2 → 7)
+const edges = [
+    {from:0, to:1, weight:2},
+    {from:1, to:2, weight:3},
+    {from:2, to:3, weight:4},
+    {from:3, to:4, weight:5},
+    {from:4, to:5, weight:2},
+    {from:5, to:6, weight:3},
+    {from:6, to:7, weight:4},
+    {from:7, to:8, weight:5},
+    {from:8, to:0, weight:2},
+    {from:2, to:6, weight:1},
+    {from:3, to:7, weight:2},
+    {from:3, to:6, weight:3} // extra edge ensures Eulerian path
+];
+
+const canvas = document.getElementById("networkCanvas");
+const ctx = canvas.getContext("2d");
+
+// --- Load city icons ---
+const cityImages = [];
+for(let i=0;i<nodes.length;i++){
+    const img = new Image();
+    img.src = 'https://cdn-icons-png.flaticon.com/512/252/252025.png';
+    cityImages.push(img);
+}
+
+// --- Load engineer icon ---
+const manImg = new Image();
+manImg.src = 'https://cdn-icons-png.flaticon.com/512/147/147144.png';
+
+// --- Draw graph ---
+function drawGraph(edgeList=null, nodeColors=null, manPos=null){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    const drawEdges = edgeList || edges;
+
+    drawEdges.forEach(e=>{
+        const from = nodes[e.from], to = nodes[e.to];
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
+        ctx.strokeStyle = e.color || "#aaa";
+        ctx.lineWidth = e.lineWidth || 2;
+        ctx.stroke();
+        ctx.fillStyle="#000";
+        ctx.fillText(e.weight,(from.x+to.x)/2,(from.y+to.y)/2-5);
+    });
+
+    nodes.forEach((n,i)=>{
+        if(nodeColors && nodeColors[i]){
+            ctx.beginPath();
+            ctx.arc(n.x,n.y,20,0,2*Math.PI);
+            ctx.fillStyle = nodeColors[i];
+            ctx.fill();
+            ctx.strokeStyle="#333";
+            ctx.stroke();
+        } else {
+            const img = cityImages[i];
+            if(img.complete) ctx.drawImage(img,n.x-15,n.y-15,30,30);
+            else img.onload = ()=>ctx.drawImage(img,n.x-15,n.y-15,30,30);
+        }
+    });
+
+    if(manPos){
+        if(manImg.complete) ctx.drawImage(manImg, manPos.x-10, manPos.y-20, 20, 20);
+        else manImg.onload = ()=>ctx.drawImage(manImg, manPos.x-10, manPos.y-20, 20, 20);
+    }
+}
+
+drawGraph();
+
+// --- Kruskal Simulation ---
+function simulateKruskal(){
+    const parent = Array(nodes.length).fill().map((_,i)=>i);
+    function find(u){ return parent[u]===u ? u : (parent[u]=find(parent[u])); }
+    function union(u,v){ parent[find(u)]=find(v); }
+
+    const sortedEdges = [...edges].sort((a,b)=>a.weight-b.weight);
+    let mstEdges=[];
+    let i=0;
+
+    function step(){
+        if(i>=sortedEdges.length) return;
+        const e = sortedEdges[i];
+        if(find(e.from)!==find(e.to)){
+            union(e.from,e.to);
+            mstEdges.push({...e,color:"#FF5733",lineWidth:4});
+        }
+        drawGraph([...mstEdges,...sortedEdges.slice(i+1).map(edge=>({...edge,lineWidth:2,color:"#ccc"}))]);
+        i++;
+        setTimeout(step,500);
+    }
+    step();
+}
+
+// --- Greedy Coloring Simulation ---
+function simulateGreedy(){
+    const colors=["#FF5733","#33C1FF","#FFEB33","#8D33FF","#33FF57"];
+    const nodeColors=Array(nodes.length).fill(null);
+    let i=0;
+
+    function step(){
+        if(i>=nodes.length) return;
+        const used = new Set();
+        edges.forEach(e=>{
+            if(e.from===i && nodeColors[e.to]!==null) used.add(nodeColors[e.to]);
+            if(e.to===i && nodeColors[e.from]!==null) used.add(nodeColors[e.from]);
+        });
+        for(const c of colors){
+            if(!used.has(c)){ nodeColors[i]=c; break; }
+        }
+        drawGraph(null,nodeColors);
+        i++;
+        setTimeout(step,500);
+    }
+    step();
+}
+
+// --- Eulerian Path Simulation (Hierholzer) ---
+function simulateEuler() {
+    const adj = {};
+    edges.forEach((e,i)=>{
+        if(!adj[e.from]) adj[e.from]=[];
+        if(!adj[e.to]) adj[e.to]=[];
+        adj[e.from].push({to:e.to, idx:i});
+        adj[e.to].push({to:e.from, idx:i});
+    });
+
+    let start = 2; // Eulerian path starts at node 2
+    const stack = [start];
+    const path = [];
+    const used = Array(edges.length).fill(false);
+
+    while(stack.length>0){
+        const v = stack[stack.length-1];
+        if(!adj[v] || adj[v].length===0){
+            path.push(stack.pop());
+        } else {
+            const {to, idx} = adj[v].pop();
+            if(!used[idx]){
+                used[idx]=true;
+                adj[to] = adj[to].filter(e=>e.idx!==idx);
+                stack.push(to);
+            }
+        }
+    }
+    path.reverse();
+
+    const edgePath = [];
+    for(let i=0;i<path.length-1;i++){
+        const from = path[i], to = path[i+1];
+        const e = edges.find(ed=>(ed.from===from && ed.to===to)||(ed.from===to && ed.to===from));
+        edgePath.push({from,to,e});
+    }
+
+    let idx=0, progress=0, speed=0.02;
+    function animate(){
+        if(idx>=edgePath.length) return;
+        const {from,to} = edgePath[idx];
+        const fx=nodes[from].x, fy=nodes[from].y;
+        const tx=nodes[to].x, ty=nodes[to].y;
+        const x = fx + (tx-fx)*progress;
+        const y = fy + (ty-fy)*progress;
+
+        const edgeList = edges.map((ed,j)=>({
+            ...ed,
+            color: used[j]?"#33C1FF":(ed===edgePath[idx].e?"#33C1FF":"#ccc"),
+            lineWidth: (ed===edgePath[idx].e||used[j])?4:2
+        }));
+        drawGraph(edgeList,null,{x,y});
+
+        progress+=speed;
+        if(progress>=1){ idx++; progress=0; }
+        requestAnimationFrame(animate);
+    }
+    animate();
+
+    console.log("Eulerian Path:", path.join(" → "));
+}
+</script>
+</body>
+</html>
